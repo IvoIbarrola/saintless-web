@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1ed" />
+    <title>Administración — Saintless</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="catalog.js" defer></script>
+    <script src="admin.js" defer></script>
+  </head>
+  <body class="admin-page" data-theme="light">
+    <header class="admin-header">
+      <a class="brand admin-brand" href="index.html" aria-label="Volver a la tienda Saintless">
+        <img class="brand-logo" src="imgs/logo-Photoroom.png" alt="Saintless" />
+      </a>
+      <div class="admin-header-actions">
+        <span class="admin-mode"><span class="admin-mode-dot"></span> Panel local</span>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Activar modo oscuro" aria-pressed="false">
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" /></svg>
+          <span class="theme-label">Modo oscuro</span>
+        </button>
+        <a class="admin-store-link" href="index.html">Ver tienda <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-intro">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span> SAINTLESS · PANEL LOCAL DE DEMOSTRACIÓN</p>
+          <h1>Tu tienda,<br /><em>bajo control.</em></h1>
+          <p>Administrá tu catálogo y revisá la actividad de las compras de demostración.</p>
+        </div>
+        <button class="button button-dark" id="add-product" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Agregar producto
+        </button>
+      </section>
+
+      <section class="admin-stats" aria-label="Estadísticas de la tienda">
+        <article class="stat-card">
+          <span class="stat-icon" aria-hidden="true">01</span>
+          <p>Productos activos</p>
+          <strong id="stat-products">0</strong>
+          <small>En tu catálogo</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon" aria-hidden="true">02</span>
+          <p>Compras simuladas</p>
+          <strong id="stat-orders">0</strong>
+          <small>Desde este navegador</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon" aria-hidden="true">03</span>
+          <p>Ingresos de prueba</p>
+          <strong id="stat-revenue">$ 0</strong>
+          <small>No representan cobros reales</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon" aria-hidden="true">04</span>
+          <p>Valor promedio</p>
+          <strong id="stat-average">$ 0</strong>
+          <small>Por compra de demostración</small>
+        </article>
+      </section>
+
+      <section class="admin-insights">
+        <article class="admin-panel category-panel">
+          <div class="admin-panel-heading">
+            <div><p class="eyebrow">CATÁLOGO</p><h2>Productos por categoría</h2></div>
+            <span class="panel-tag">HOY</span>
+          </div>
+          <div class="category-chart" id="category-chart"></div>
+        </article>
+        <article class="admin-panel orders-panel">
+          <div class="admin-panel-heading">
+            <div><p class="eyebrow">ACTIVIDAD</p><h2>Compras recientes</h2></div>
+            <button class="clear-filters" id="clear-demo-orders" type="button">Borrar pruebas</button>
+          </div>
+          <div id="recent-orders"></div>
+          <p class="admin-empty" id="orders-empty">Todavía no hay compras de demostración. Podés crear una desde la bolsa de la tienda.</p>
+        </article>
+      </section>
+
+      <section class="admin-panel catalog-panel" aria-labelledby="admin-catalog-title">
+        <div class="admin-panel-heading catalog-panel-heading">
+          <div><p class="eyebrow">INVENTARIO DIGITAL</p><h2 id="admin-catalog-title">Tu catálogo</h2></div>
+          <label class="admin-search">
+            <span class="sr-only">Buscar producto</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></svg>
+            <input id="product-search" type="search" placeholder="Buscar producto..." />
+          </label>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Etiqueta</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+            <tbody id="admin-product-list"></tbody>
+          </table>
+          <p class="admin-empty" id="products-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
+        </div>
+      </section>
+      <p class="admin-disclaimer">Este panel no tiene autenticación. Los datos se guardan únicamente en el almacenamiento local de este navegador. Las estadísticas corresponden a compras ficticias de demostración; no hay pagos, base de datos ni sincronización entre dispositivos.</p>
+    </main>
+
+    <dialog class="product-editor" id="product-editor" aria-labelledby="editor-title">
+      <form id="product-form" method="dialog">
+        <div class="editor-heading">
+          <div><p class="eyebrow">CATÁLOGO SAINTLESS</p><h2 id="editor-title">Agregar producto</h2></div>
+          <button class="icon-button" id="close-editor" type="button" aria-label="Cerrar formulario">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <input id="edit-product-id" type="hidden" />
+        <label for="edit-product-name">Nombre</label>
+        <input id="edit-product-name" required maxlength="70" />
+        <div class="editor-two-col">
+          <div><label for="edit-product-category">Categoría</label><input id="edit-product-category" required maxlength="35" placeholder="Ej. Collares" /></div>
+          <div><label for="edit-product-price">Precio en ARS</label><input id="edit-product-price" type="number" min="1" step="any" required /></div>
+        </div>
+        <label for="edit-product-image">Imagen del catálogo</label>
+        <select id="edit-product-image" required></select>
+        <label for="edit-product-alt">Descripción de imagen</label>
+        <input id="edit-product-alt" required maxlength="140" />
+        <div class="editor-two-col">
+          <div><label for="edit-product-tag">Etiqueta (opcional)</label><input id="edit-product-tag" maxlength="24" placeholder="NUEVO" /></div>
+          <div><label for="edit-product-caption">Texto corto</label><input id="edit-product-caption" maxlength="80" placeholder="Descripción breve" /></div>
+        </div>
+        <p class="editor-error" id="editor-error" role="alert"></p>
+        <div class="editor-actions">
+          <button class="button button-quiet" id="cancel-editor" type="button">Cancelar</button>
+          <button class="button button-dark" type="submit">Guardar producto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="admin-toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
