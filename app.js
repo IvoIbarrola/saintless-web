@@ -3,28 +3,22 @@ const savedProducts = localStorage.getItem("saintlessProducts");
 const products = savedProducts ? JSON.parse(savedProducts) : [...defaultProducts];
 if (!savedProducts) localStorage.setItem("saintlessProducts", JSON.stringify(products));
 
-const pickupPoints = [
-  {
-    id: "feria-palermo",
-    name: "Feria mensual · Punto 1",
-    detail: "Ubicación y fecha a confirmar",
-  },
-  {
-    id: "feria-san-telmo",
-    name: "Feria mensual · Punto 2",
-    detail: "Ubicación y fecha a confirmar",
-  },
-  {
-    id: "feria-proxima",
-    name: "Próxima feria",
-    detail: "La fecha y el punto se coordinan por mensaje",
-  },
-];
-
-const referenceRates = [
-  { minPostalCode: 1000, maxPostalCode: 1499, price: 3900, label: "CABA" },
-  { minPostalCode: 1500, maxPostalCode: 1899, price: 5200, label: "GBA" },
-];
+const CONFIG_KEY = "saintlessStoreConfig";
+const defaultConfig = window.SAINTLESS_DEFAULT_CONFIG;
+const storedConfig = localStorage.getItem(CONFIG_KEY);
+const storedConfigValue = storedConfig ? JSON.parse(storedConfig) : {};
+const parsedConfig = storedConfigValue && typeof storedConfigValue === "object" && !Array.isArray(storedConfigValue)
+  ? storedConfigValue
+  : {};
+const storeConfig = {
+  ...defaultConfig,
+  ...parsedConfig,
+  shippingZones: Array.isArray(parsedConfig.shippingZones) ? parsedConfig.shippingZones : defaultConfig.shippingZones,
+  pickupPoints: Array.isArray(parsedConfig.pickupPoints) ? parsedConfig.pickupPoints : defaultConfig.pickupPoints,
+  appearance: { ...defaultConfig.appearance, ...(parsedConfig.appearance || {}) },
+};
+const pickupPoints = storeConfig.pickupPoints;
+const referenceRates = storeConfig.shippingZones;
 
 const formatPrice = (value) => `$ ${new Intl.NumberFormat("es-AR").format(value)}`;
 const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -34,7 +28,7 @@ const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (character) => (
   '"': "&quot;",
   "'": "&#39;",
 })[character]);
-const state = { category: "Todos", cart: new Map(), selectedPickup: pickupPoints[0].id, shippingEstimate: null };
+const state = { category: "Todos", cart: new Map(), selectedPickup: pickupPoints[0]?.id || "", shippingEstimate: null };
 const productGrid = document.querySelector("#product-grid");
 const categoryOptions = document.querySelector("#category-options");
 const productCount = document.querySelector("#product-count");
@@ -43,6 +37,7 @@ const minPrice = document.querySelector("#min-price");
 const maxPrice = document.querySelector("#max-price");
 const sortProducts = document.querySelector("#sort-products");
 const cartDialog = document.querySelector("#cart-dialog");
+const filterDialog = document.querySelector("#filter-dialog");
 const toast = document.querySelector("#toast");
 let toastTimeout;
 let revealObserver;
@@ -60,12 +55,20 @@ function updateTheme(theme) {
   document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#121211" : "#f4f1ed";
 }
 
+function updateAppearance() {
+  const { primaryColor, accentColor, announcement } = storeConfig.appearance;
+  if (/^#[\da-f]{6}$/i.test(primaryColor || "")) document.body.style.setProperty("--wine", primaryColor);
+  if (/^#[\da-f]{6}$/i.test(accentColor || "")) document.body.style.setProperty("--red", accentColor);
+  const announcementMessage = document.querySelector("#announcement-message");
+  if (announcementMessage) announcementMessage.textContent = announcement;
+}
+
 function initializeMotion() {
   revealObserver?.disconnect();
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const revealItems = document.querySelectorAll(".section-heading, .filters, .product-card, .delivery-card, .manifesto > *");
+  const revealItems = document.querySelectorAll(".section-heading, .product-card, .delivery-card, .manifesto > *");
   document.body.classList.add("motion-ready");
-  if (reducedMotion || !("IntersectionObserver" in window)) {
+  if (!storeConfig.appearance.motion || reducedMotion || !("IntersectionObserver" in window)) {
     revealItems.forEach((element) => element.classList.add("is-visible"));
     return;
   }
@@ -92,6 +95,58 @@ function renderCategories() {
       <span>${escapeHTML(category)}</span><span class="category-count">${String(count).padStart(2, "0")}</span>
     </button>`;
   }).join("");
+}
+
+function updateActiveFilters() {
+  const activeCount = Number(Boolean(minPrice.value)) + Number(Boolean(maxPrice.value));
+  const count = activeCount + Number(state.category !== "Todos");
+  const badge = document.querySelector("#active-filter-count");
+  badge.textContent = String(count);
+  badge.hidden = count === 0;
+  document.querySelector("#open-filters").setAttribute("aria-label", count ? `Abrir filtros, ${count} activos` : "Abrir filtros");
+}
+
+function updateFilterDialogMode() {
+  const isMobile = window.matchMedia("(max-width: 760px)").matches;
+  const openButton = document.querySelector("#open-filters");
+  if (isMobile) {
+    if (filterDialog.open && !filterDialog.matches(":modal")) filterDialog.close();
+    openButton.setAttribute("aria-expanded", String(filterDialog.matches(":modal")));
+  } else {
+    if (filterDialog.matches(":modal")) filterDialog.close();
+    filterDialog.setAttribute("open", "");
+    openButton.setAttribute("aria-expanded", "false");
+  }
+}
+
+function setCheckoutStep(step) {
+  document.querySelectorAll("[data-checkout-step]").forEach((section) => {
+    section.hidden = Number(section.dataset.checkoutStep) !== step;
+  });
+  document.querySelectorAll("[data-step-indicator]").forEach((indicator) => {
+    const isCurrent = Number(indicator.dataset.stepIndicator) === step;
+    indicator.classList.toggle("is-current", isCurrent);
+    indicator.classList.toggle("is-complete", Number(indicator.dataset.stepIndicator) < step);
+    if (isCurrent) indicator.setAttribute("aria-current", "step");
+    else indicator.removeAttribute("aria-current");
+  });
+  if (step === 2) document.querySelector("#checkout-payment-title").focus();
+}
+
+function validateCheckoutContact() {
+  const phoneField = document.querySelector("#checkout-phone");
+  const phoneDigits = phoneField.value.replace(/\D/g, "");
+  phoneField.setCustomValidity(
+    phoneDigits.length >= 10 && phoneDigits.length <= 15
+      ? ""
+      : "Ingresá un número de WhatsApp con código de país (entre 10 y 15 dígitos).",
+  );
+  const requiredFields = [...document.querySelector('[data-checkout-step="1"]').querySelectorAll("input[required]")];
+  const invalidField = requiredFields.find((field) => !field.checkValidity());
+  if (!invalidField) return true;
+  invalidField.reportValidity();
+  invalidField.focus();
+  return false;
 }
 
 function getVisibleProducts() {
@@ -131,23 +186,26 @@ function renderProducts() {
       </div>
     </article>
   `).join("");
+  updateActiveFilters();
   initializeMotion();
 }
 
 function renderPickupOptions() {
   const options = pickupPoints.map((point) => `
     <label class="pickup-option">
-      <input type="radio" name="pickup-point" value="${point.id}" ${point.id === state.selectedPickup ? "checked" : ""} />
-      <span><strong>${point.name}</strong><small>${point.detail}</small></span>
+      <input type="radio" name="pickup-point" value="${escapeHTML(point.id)}" ${point.id === state.selectedPickup ? "checked" : ""} />
+      <span><strong>${escapeHTML(point.name)}</strong><small>${escapeHTML(point.detail)}</small></span>
       <em>GRATIS</em>
     </label>
   `).join("");
   document.querySelector("#pickup-options-list").innerHTML = options;
   document.querySelector("#cart-pickup-select").innerHTML = pickupPoints
-    .map((point) => `<option value="${point.id}">${point.name} · Gratis</option>`)
+    .map((point) => `<option value="${escapeHTML(point.id)}">${escapeHTML(point.name)} · Gratis</option>`)
     .join("");
+  if (!pickupPoints.some((point) => point.id === state.selectedPickup)) state.selectedPickup = pickupPoints[0]?.id || "";
   document.querySelector("#cart-pickup-select").value = state.selectedPickup;
   renderSelectedPickup();
+  document.querySelector("#pickup-count").textContent = String(pickupPoints.length).padStart(2, "0");
 }
 
 function renderSelectedPickup() {
@@ -205,6 +263,15 @@ function renderCart() {
     : "El retiro en feria es gratuito. Coordinamos el punto y día después de tu consulta.";
   document.querySelector("#checkout-address-wrap").hidden = !deliveryIsShipping;
   document.querySelector("#checkout-address").required = deliveryIsShipping;
+  updateCheckoutReview();
+}
+
+function updateCheckoutReview() {
+  const subtotal = [...state.cart.values()].reduce((total, item) => total + item.product.price * item.quantity, 0);
+  const shipping = selectedDelivery() === "shipping" ? getCartShippingPrice() : 0;
+  document.querySelector("#checkout-subtotal").textContent = formatPrice(subtotal);
+  document.querySelector("#checkout-delivery").textContent = shipping === null ? "A confirmar" : shipping ? formatPrice(shipping) : "Gratis";
+  document.querySelector("#checkout-total").textContent = formatPrice(subtotal + (shipping ?? 0));
 }
 
 function showToast(message) {
@@ -229,9 +296,9 @@ function estimateShipping(postalCode) {
     return { error: "Ingresá un código postal válido de 4 a 8 números." };
   }
   const numericPostalCode = Number(normalized.slice(0, 4));
-  const rate = referenceRates.find((item) => numericPostalCode >= item.minPostalCode && numericPostalCode <= item.maxPostalCode);
+  const rate = referenceRates.find((item) => numericPostalCode >= Number(item.postalStart) && numericPostalCode <= Number(item.postalEnd));
   return rate
-    ? { price: rate.price, zone: rate.label }
+    ? { price: Number(rate.price), zone: rate.name }
     : { error: "Para esta zona, el costo se confirma al coordinar el pedido." };
 }
 
@@ -256,6 +323,7 @@ categoryOptions.addEventListener("click", (event) => {
   state.category = button.dataset.category;
   renderCategories();
   renderProducts();
+  if (filterDialog.matches(":modal")) filterDialog.close();
 });
 
 for (const input of [minPrice, maxPrice]) {
@@ -270,6 +338,20 @@ sortProducts.addEventListener("change", renderProducts);
 
 document.querySelector("#clear-filters").addEventListener("click", resetFilters);
 document.querySelector("#empty-reset").addEventListener("click", resetFilters);
+document.querySelector("#open-filters").addEventListener("click", () => {
+  if (filterDialog.matches(":modal")) return;
+  if (filterDialog.open) filterDialog.close();
+  filterDialog.showModal();
+  document.querySelector("#open-filters").setAttribute("aria-expanded", "true");
+  document.querySelector("#filter-title").focus();
+});
+document.querySelector("#close-filters").addEventListener("click", () => filterDialog.close());
+filterDialog.addEventListener("click", (event) => {
+  if (event.target === filterDialog && filterDialog.matches(":modal")) filterDialog.close();
+});
+filterDialog.addEventListener("close", () => document.querySelector("#open-filters").setAttribute("aria-expanded", "false"));
+window.addEventListener("resize", updateFilterDialogMode);
+window.matchMedia("(max-width: 760px)").addEventListener("change", updateFilterDialogMode);
 document.querySelector("#estimate-shipping").addEventListener("click", () => {
   runShippingEstimate(document.querySelector("#postal-code"), document.querySelector("#shipping-result"));
 });
@@ -359,6 +441,8 @@ document.querySelector("#checkout-button").addEventListener("click", () => {
   }
   document.querySelector("#checkout-form").hidden = false;
   document.querySelector("#checkout-button").hidden = true;
+  setCheckoutStep(1);
+  updateCheckoutReview();
   document.querySelector("#checkout-name").focus();
 });
 document.querySelector("#back-to-cart").addEventListener("click", () => {
@@ -366,22 +450,45 @@ document.querySelector("#back-to-cart").addEventListener("click", () => {
   document.querySelector("#checkout-button").hidden = false;
   document.querySelector("#checkout-button").focus();
 });
+document.querySelector("#checkout-next").addEventListener("click", () => {
+  if (!validateCheckoutContact()) return;
+  setCheckoutStep(2);
+});
+document.querySelector("#checkout-previous").addEventListener("click", () => {
+  setCheckoutStep(1);
+  document.querySelector("#checkout-name").focus();
+});
 document.querySelector("#checkout-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  if (document.querySelector('[data-checkout-step="1"]').hidden === false) {
+    if (validateCheckoutContact()) setCheckoutStep(2);
+    return;
+  }
   if (!form.reportValidity()) return;
   const items = [...state.cart.values()];
   if (!items.length) return;
   const shipping = selectedDelivery() === "shipping" ? getCartShippingPrice() ?? 0 : 0;
   const subtotal = items.reduce((total, item) => total + item.product.price * item.quantity, 0);
   const orders = JSON.parse(localStorage.getItem("saintlessDemoOrders") || "[]");
+  const formData = new FormData(form);
+  const selectedPickupPoint = pickupPoints.find((point) => point.id === state.selectedPickup);
   const order = {
     id: `DEMO-${Date.now().toString().slice(-8)}`,
     date: new Date().toISOString(),
     total: subtotal + shipping,
     items: items.map(({ product, quantity }) => ({ id: product.id, name: product.name, quantity, price: product.price })),
     delivery: selectedDelivery(),
-    payment: new FormData(form).get("payment-method"),
+    deliveryDetails: selectedDelivery() === "pickup"
+      ? selectedPickupPoint ? `${selectedPickupPoint.name} · ${selectedPickupPoint.detail}` : "Punto de retiro a coordinar"
+      : document.querySelector("#checkout-address").value.trim(),
+    postalCode: selectedDelivery() === "shipping" ? document.querySelector("#cart-postal-code").value.trim() : "",
+    payment: formData.get("payment-method"),
+    customer: {
+      name: String(formData.get("name") || "").trim(),
+      email: String(formData.get("email") || "").trim(),
+      phone: String(formData.get("phone") || "").trim(),
+    },
     status: "Simulación",
   };
   orders.push(order);
@@ -392,6 +499,7 @@ document.querySelector("#checkout-form").addEventListener("submit", (event) => {
   form.reset();
   form.hidden = true;
   document.querySelector("#checkout-button").hidden = false;
+  setCheckoutStep(1);
   cartDialog.close();
   showToast(`Compra simulada ${order.id}: no se realizó ningún cobro.`);
 });
@@ -403,6 +511,7 @@ document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
 });
 
 productGrid.addEventListener("pointermove", (event) => {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
   const card = event.target.closest(".product-card");
   if (!card) return;
@@ -424,15 +533,27 @@ document.querySelector("#cart-postal-code").addEventListener("input", () => {
   renderCart();
 });
 
+function updateScrollProgress() {
+  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const progress = scrollableHeight > 0 ? (window.scrollY / scrollableHeight) * 100 : 0;
+  document.querySelector("#scroll-progress").style.width = `${Math.min(100, Math.max(0, progress))}%`;
+}
+
 /*
  * The storefront uses a vanilla-CSS adaptation of 21st.dev's Product Card
  * interaction: image lift, pointer-follow glow, and a restrained hover tilt.
  * The reveal observer above adds staggered entrance motion without a runtime dependency.
  */
-updateTheme(localStorage.getItem("saintlessTheme") || "light");
+updateAppearance();
+updateTheme(localStorage.getItem("saintlessTheme") || storeConfig.appearance.defaultTheme || "light");
 initializeMotion();
+updateFilterDialogMode();
+updateScrollProgress();
+window.addEventListener("scroll", updateScrollProgress, { passive: true });
+document.querySelector("#announcement-message").textContent = storeConfig.appearance.announcement;
 window.addEventListener("storage", (event) => {
   if (event.key === "saintlessProducts" && event.newValue) window.location.reload();
+  if (event.key === CONFIG_KEY) window.location.reload();
 });
 
 document.querySelector("#current-year").textContent = String(new Date().getFullYear());

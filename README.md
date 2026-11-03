@@ -19,19 +19,20 @@ aplicación ni un proceso de compilación.
 
 - Los productos, nombres, categorías, precios de muestra y rutas de imágenes están
   definidos en `catalog.js`. El catálogo editable se comparte con `admin.html`.
-- Los puntos de retiro de muestra (sin ubicación ni fecha confirmadas) se editan en
-  el arreglo `pickupPoints` de `app.js`.
-- Las tarifas mostradas son de referencia para CABA y GBA; se editan en
-  `referenceRates` en `app.js`. Confirmá y reemplazá precios, zonas, ferias y fechas
-  con los datos vigentes antes de publicar.
+- Las zonas de envío de referencia y los puntos gratuitos de retiro se configuran
+  desde el panel `admin.html`; sus valores predeterminados están en `config.js`.
+  La tienda estima el costo con el rango postal configurado y muestra los puntos
+  de retiro disponibles.
 - Las imágenes existentes se sirven desde `imgs/`. `Encabezado.jpg` se usa como
   imagen principal y `logo-Photoroom.png` como marca.
 
 El panel `admin.html`, el tema elegido, el catálogo editado y las compras simuladas
 usan `localStorage` del navegador. No hay autenticación, backend ni sincronización
-entre dispositivos. Las compras son ficticias: no se captura información de tarjeta,
-no se transmite información personal y no se realiza ningún cobro. La tarifa postal
-es una referencia local, no una cotización de correo.
+entre dispositivos. Las compras son ficticias: no se capturan datos de tarjeta ni
+se realiza ningún cobro. Los datos de contacto de los pedidos de demostración se
+guardan localmente; el panel solo ofrece abrir WhatsApp con un mensaje precompletado
+cuando el administrador elige hacerlo. No hay chat integrado ni envío automático.
+Las tarifas postales son referencias locales, no cotizaciones de correo.
 
 Las tarjetas de producto toman como referencia la interacción "Product Card" de
 21st.dev (resplandor sensible al puntero, inclinación leve y movimiento de imagen),

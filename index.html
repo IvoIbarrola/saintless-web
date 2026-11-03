@@ -17,15 +17,13 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <script src="catalog.js" defer></script>
+    <script src="config.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
+    <div class="scroll-progress" aria-hidden="true"><span id="scroll-progress"></span></div>
     <div class="announcement">
-      <span>ESTILO PROPIO, SIN REGLAS</span>
-      <span class="announcement-separator" aria-hidden="true">·</span>
-      <span>RETIRO GRATIS EN FERIAS</span>
-      <span class="announcement-separator" aria-hidden="true">·</span>
-      <span>ENVÍO A COORDINAR</span>
+      <span id="announcement-message">RETIRO GRATIS EN FERIAS · ENVÍO A COORDINAR</span>
     </div>
 
     <header class="site-header">
@@ -103,10 +101,14 @@
         </div>
 
         <div class="shop-layout">
+          <dialog class="filter-dialog" id="filter-dialog" open aria-labelledby="filter-title">
           <aside class="filters" aria-label="Filtros de productos">
             <div class="filter-top">
-              <h3>Filtrar por</h3>
+              <h3 id="filter-title" tabindex="-1">Filtrar por</h3>
               <button class="clear-filters" id="clear-filters" type="button">Limpiar</button>
+              <button class="filter-close icon-button" id="close-filters" type="button" aria-label="Cerrar filtros">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+              </button>
             </div>
             <fieldset class="filter-group category-filter">
               <legend>Categoría</legend>
@@ -135,9 +137,15 @@
               <a href="#retiros">Ver puntos de retiro <span aria-hidden="true">→</span></a>
             </div>
           </aside>
+          </dialog>
 
           <div class="product-area">
             <div class="product-toolbar">
+              <button class="mobile-filter-button" id="open-filters" type="button" aria-haspopup="dialog" aria-controls="filter-dialog" aria-expanded="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+                <span>Filtros</span>
+                <span class="active-filter-count" id="active-filter-count" hidden>0</span>
+              </button>
               <p id="product-count" aria-live="polite"></p>
               <span class="price-note">Precios de muestra · ARS</span>
               <label class="sort-control" for="sort-products">
@@ -191,7 +199,7 @@
               <svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
             </span>
             <h3>Retiro sin cargo</h3>
-            <p>Elegí el punto que te quede mejor. <strong>Siempre gratis.</strong></p>
+            <p><span id="pickup-count">00</span> puntos de retiro para elegir. <strong>Siempre gratis.</strong></p>
             <div class="pickup-list" id="pickup-options-list"></div>
             <p class="pickup-selected" id="pickup-selected" aria-live="polite">Elegí un punto para reservar tu retiro.</p>
           </article>
@@ -258,31 +266,68 @@
         <p class="cart-note" id="cart-note">El retiro en feria es gratuito. Coordinamos el punto y día después de tu consulta.</p>
         <button class="button button-dark checkout-button" id="checkout-button" type="button">Ir al pago de demostración</button>
         <form class="checkout-form" id="checkout-form" hidden>
+          <div class="checkout-topline">
+            <button class="checkout-back icon-button" id="back-to-cart" type="button" aria-label="Volver a la bolsa">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" /></svg>
+            </button>
+            <span>FINALIZAR PEDIDO</span>
+            <span class="secure-mark" aria-label="Demostración segura">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 1 1 8 0v3" /></svg>
+              DEMO
+            </span>
+          </div>
           <div class="checkout-heading">
-            <p class="eyebrow">MODO DEMOSTRACIÓN</p>
-            <h3>Un último detalle.</h3>
-            <p>No se realizará ningún cobro ni se enviarán datos a un servicio externo.</p>
+            <p class="eyebrow">UNA COMPRA CON INTENCIÓN</p>
+            <h3>Último paso,<br /><em>tu estilo.</em></h3>
+            <p>Completá tus datos y elegí cómo cerrar este pedido de prueba.</p>
           </div>
-          <label for="checkout-name">Nombre y apellido</label>
-          <input id="checkout-name" name="name" autocomplete="name" required />
-          <label for="checkout-email">Correo electrónico</label>
-          <input id="checkout-email" name="email" type="email" autocomplete="email" required />
-          <label for="checkout-phone">Teléfono de contacto</label>
-          <input id="checkout-phone" name="phone" type="tel" autocomplete="tel" required />
-          <div id="checkout-address-wrap" hidden>
-            <label for="checkout-address">Dirección de entrega</label>
-            <input id="checkout-address" name="address" autocomplete="street-address" />
+          <div class="checkout-progress" aria-label="Progreso del pago">
+            <div class="checkout-progress-step is-current" data-step-indicator="1"><span>01</span><strong>Tus datos</strong></div>
+            <span class="checkout-progress-line"></span>
+            <div class="checkout-progress-step" data-step-indicator="2"><span>02</span><strong>Confirmar</strong></div>
           </div>
-          <fieldset class="payment-methods">
-            <legend>Medio de pago (simulado)</legend>
-            <label><input type="radio" name="payment-method" value="card" checked /><span>Tarjeta de crédito</span></label>
-            <label><input type="radio" name="payment-method" value="transfer" /><span>Transferencia bancaria</span></label>
-          </fieldset>
-          <p class="demo-payment-note">Prototipo: no ingreses datos de tarjeta. La confirmación es ficticia.</p>
-          <div class="checkout-actions">
-            <button class="text-link" id="back-to-cart" type="button">Volver a la bolsa</button>
-            <button class="button button-dark" type="submit">Simular compra</button>
-          </div>
+          <section class="checkout-step" data-checkout-step="1" aria-labelledby="checkout-contact-title">
+            <h4 id="checkout-contact-title">¿A quién preparamos el pedido?</h4>
+            <div class="checkout-fields">
+              <label class="checkout-field" for="checkout-name"><span>Nombre y apellido</span><input id="checkout-name" name="name" autocomplete="name" placeholder="Tu nombre" required /></label>
+              <label class="checkout-field" for="checkout-email"><span>Correo electrónico</span><input id="checkout-email" name="email" type="email" autocomplete="email" placeholder="vos@correo.com" required /></label>
+              <label class="checkout-field" for="checkout-phone"><span>WhatsApp con código de país</span><input id="checkout-phone" name="phone" type="tel" autocomplete="tel" placeholder="+54911..." minlength="10" maxlength="20" title="Incluí el código de país, por ejemplo +54911..." required /></label>
+              <label class="checkout-field checkout-address-field" id="checkout-address-wrap" for="checkout-address" hidden><span>Dirección de entrega</span><input id="checkout-address" name="address" autocomplete="street-address" placeholder="Calle, número y localidad" /></label>
+            </div>
+            <p class="checkout-privacy">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></svg>
+              Tus datos se quedan en esta demostración local.
+            </p>
+            <button class="button button-dark checkout-next" id="checkout-next" type="button">Continuar <span aria-hidden="true">→</span></button>
+          </section>
+          <section class="checkout-step" data-checkout-step="2" aria-labelledby="checkout-payment-title" hidden>
+            <h4 id="checkout-payment-title" tabindex="-1">Elegí cómo pagar</h4>
+            <fieldset class="payment-methods">
+              <legend class="sr-only">Medio de pago simulado</legend>
+              <label class="payment-method-card">
+                <input type="radio" name="payment-method" value="card" checked />
+                <span class="payment-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18m-14 5h4" /></svg></span>
+                <span class="payment-method-copy"><strong>Tarjeta</strong><small>Crédito o débito · simulado</small></span>
+                <span class="payment-check" aria-hidden="true"></span>
+              </label>
+              <label class="payment-method-card">
+                <input type="radio" name="payment-method" value="transfer" />
+                <span class="payment-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10h18L12 3 3 10Zm2 2v6m5-6v6m4-6v6m5-6v6M3 21h18" /></svg></span>
+                <span class="payment-method-copy"><strong>Transferencia</strong><small>Coordinamos los datos · simulado</small></span>
+                <span class="payment-check" aria-hidden="true"></span>
+              </label>
+            </fieldset>
+            <div class="checkout-review">
+              <div><span>Productos</span><strong id="checkout-subtotal">$ 0</strong></div>
+              <div><span>Entrega</span><strong id="checkout-delivery">Gratis</strong></div>
+              <div class="checkout-review-total"><span>Total estimado</span><strong id="checkout-total">$ 0</strong></div>
+            </div>
+            <p class="demo-payment-note"><strong>Modo de demostración.</strong> No ingreses datos de tarjeta: no se realizará ningún cobro.</p>
+            <div class="checkout-actions">
+              <button class="text-link" id="checkout-previous" type="button">← Tus datos</button>
+              <button class="button button-dark" type="submit">Simular compra <span aria-hidden="true">→</span></button>
+            </div>
+          </section>
         </form>
       </div>
     </dialog>

@@ -13,6 +13,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <script src="catalog.js" defer></script>
+    <script src="config.js" defer></script>
     <script src="admin.js" defer></script>
   </head>
   <body class="admin-page" data-theme="light">
@@ -89,6 +90,40 @@
         </article>
       </section>
 
+      <section class="admin-panel settings-panel" aria-labelledby="admin-settings-title">
+        <div class="admin-panel-heading">
+          <div><p class="eyebrow">PERSONALIZACIÓN</p><h2 id="admin-settings-title">Tu espacio, tus reglas</h2></div>
+          <span class="panel-tag">GUARDADO EN ESTE NAVEGADOR</span>
+        </div>
+        <form class="settings-form" id="settings-form">
+          <div class="settings-group">
+            <div class="settings-group-heading"><span class="settings-index">01</span><div><h3>Identidad y experiencia</h3><p>Definí el ambiente y el ritmo de la tienda.</p></div></div>
+            <label for="setting-theme">Tema inicial</label>
+            <select id="setting-theme"><option value="light">Claro</option><option value="dark">Oscuro</option></select>
+            <label for="setting-announcement">Texto de la franja superior</label>
+            <input id="setting-announcement" maxlength="100" />
+            <div class="settings-two-col">
+              <label class="color-setting" for="setting-primary"><span>Color principal</span><input id="setting-primary" type="color" /></label>
+              <label class="color-setting" for="setting-accent"><span>Color de acento</span><input id="setting-accent" type="color" /></label>
+            </div>
+            <label class="setting-switch" for="setting-motion"><input id="setting-motion" type="checkbox" /><span><strong>Animaciones de entrada</strong><small>Respetan la preferencia de movimiento reducido del visitante.</small></span></label>
+            <button class="button button-dark" type="submit">Guardar personalización</button>
+          </div>
+        </form>
+        <div class="delivery-settings">
+          <section class="settings-group" aria-labelledby="shipping-settings-title">
+            <div class="settings-group-heading"><span class="settings-index">02</span><div><h3 id="shipping-settings-title">Zonas de envío</h3><p>Rango de código postal y costo de referencia.</p></div></div>
+            <div class="config-list" id="shipping-zone-list"></div>
+            <button class="button button-quiet config-add-button" id="add-shipping-zone" type="button">+ Agregar zona</button>
+          </section>
+          <section class="settings-group" aria-labelledby="pickup-settings-title">
+            <div class="settings-group-heading"><span class="settings-index">03</span><div><h3 id="pickup-settings-title">Puntos de retiro gratis</h3><p>Ferias, direcciones y fechas para coordinar.</p></div></div>
+            <div class="config-list" id="pickup-point-list"></div>
+            <button class="button button-quiet config-add-button" id="add-pickup-point" type="button">+ Agregar punto de retiro</button>
+          </section>
+        </div>
+      </section>
+
       <section class="admin-panel catalog-panel" aria-labelledby="admin-catalog-title">
         <div class="admin-panel-heading catalog-panel-heading">
           <div><p class="eyebrow">INVENTARIO DIGITAL</p><h2 id="admin-catalog-title">Tu catálogo</h2></div>
@@ -106,7 +141,7 @@
           <p class="admin-empty" id="products-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
         </div>
       </section>
-      <p class="admin-disclaimer">Este panel no tiene autenticación. Los datos se guardan únicamente en el almacenamiento local de este navegador. Las estadísticas corresponden a compras ficticias de demostración; no hay pagos, base de datos ni sincronización entre dispositivos.</p>
+      <p class="admin-disclaimer">Este panel no tiene autenticación. Los datos se guardan únicamente en el almacenamiento local de este navegador. Las estadísticas corresponden a compras ficticias de demostración; no hay pagos, base de datos ni sincronización entre dispositivos. Los mensajes a clientes se redactan y se abren en WhatsApp por acción del administrador; no se envían automáticamente desde este panel.</p>
     </main>
 
     <dialog class="product-editor" id="product-editor" aria-labelledby="editor-title">
@@ -137,6 +172,28 @@
           <button class="button button-quiet" id="cancel-editor" type="button">Cancelar</button>
           <button class="button button-dark" type="submit">Guardar producto</button>
         </div>
+      </form>
+    </dialog>
+
+    <dialog class="product-editor config-editor" id="config-item-editor" aria-labelledby="config-item-title">
+      <form id="config-item-form">
+        <div class="editor-heading">
+          <div><p class="eyebrow">ENTREGAS SAINTLESS</p><h2 id="config-item-title">Nueva opción</h2></div>
+          <button class="icon-button" id="close-config-editor" type="button" aria-label="Cerrar formulario"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+        </div>
+        <input id="config-item-type" type="hidden" />
+        <input id="config-item-id" type="hidden" />
+        <label for="config-item-name">Nombre</label><input id="config-item-name" required maxlength="70" />
+        <div class="config-zone-fields">
+          <div class="editor-two-col">
+            <div><label for="config-postal-start">Código postal desde</label><input id="config-postal-start" type="number" min="0" max="9999" inputmode="numeric" /></div>
+            <div><label for="config-postal-end">Código postal hasta</label><input id="config-postal-end" type="number" min="0" max="9999" inputmode="numeric" /></div>
+          </div>
+          <label for="config-shipping-price">Costo de referencia en ARS</label><input id="config-shipping-price" type="number" min="0" step="100" inputmode="numeric" />
+        </div>
+        <div class="config-pickup-fields"><label for="config-pickup-detail">Ubicación y fecha</label><input id="config-pickup-detail" maxlength="120" placeholder="Dirección · día y horario" /></div>
+        <p class="editor-error" id="config-item-error" role="alert"></p>
+        <div class="editor-actions"><button class="button button-quiet" id="cancel-config-editor" type="button">Cancelar</button><button class="button button-dark" type="submit">Guardar opción</button></div>
       </form>
     </dialog>
 

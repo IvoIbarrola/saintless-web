@@ -1,10 +1,32 @@
 const PRODUCT_KEY = "saintlessProducts";
 const ORDER_KEY = "saintlessDemoOrders";
+const CONFIG_KEY = "saintlessStoreConfig";
 const PRODUCT_DEFAULTS = window.SAINTLESS_PRODUCTS;
+const CONFIG_DEFAULTS = window.SAINTLESS_DEFAULT_CONFIG;
 const productEditor = document.querySelector("#product-editor");
 const productForm = document.querySelector("#product-form");
 const toast = document.querySelector("#admin-toast");
 let toastTimer;
+const configItemEditor = document.querySelector("#config-item-editor");
+const configItemForm = document.querySelector("#config-item-form");
+
+function getStoreConfig() {
+  const saved = localStorage.getItem(CONFIG_KEY);
+  const parsedValue = saved ? JSON.parse(saved) : {};
+  const parsed = parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue) ? parsedValue : {};
+  return {
+    ...CONFIG_DEFAULTS,
+    ...parsed,
+    shippingZones: Array.isArray(parsed.shippingZones) ? parsed.shippingZones : CONFIG_DEFAULTS.shippingZones.map((zone) => ({ ...zone })),
+    pickupPoints: Array.isArray(parsed.pickupPoints) ? parsed.pickupPoints : CONFIG_DEFAULTS.pickupPoints.map((point) => ({ ...point })),
+    appearance: { ...CONFIG_DEFAULTS.appearance, ...(parsed.appearance || {}) },
+  };
+}
+
+function saveStoreConfig(config) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  renderStoreSettings(config);
+}
 
 function getProducts() {
   const saved = localStorage.getItem(PRODUCT_KEY);
@@ -71,12 +93,87 @@ function renderOrders(orders) {
     const formattedDate = Number.isNaN(date.valueOf())
       ? "Fecha no disponible"
       : new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short" }).format(date);
+    const customer = order.customer || {};
+    const whatsappHref = configureContactMessage(order);
     return `<article class="recent-order">
       <span class="order-symbol" aria-hidden="true">S.</span>
-      <span class="order-description"><strong>${escapeHTML(order.id)}</strong><small>${formattedDate} · ${escapeHTML(order.delivery === "pickup" ? "Retiro gratis" : "Envío")}</small></span>
-      <b>${formatPrice(Number(order.total || 0))}</b>
+      <span class="order-description"><strong>${escapeHTML(customer.name || order.id)}</strong><small>${escapeHTML(order.id)} · ${formattedDate} · ${escapeHTML(order.delivery === "pickup" ? "Retiro gratis" : "Envío")}</small></span>
+      <span class="order-contact">
+        <b>${formatPrice(Number(order.total || 0))}</b>
+        ${whatsappHref ? `<a class="whatsapp-contact" href="${whatsappHref}" target="_blank" rel="noopener noreferrer" aria-label="Contactar a ${escapeHTML(customer.name || "cliente")} por WhatsApp">WhatsApp ↗</a>` : `<small class="contact-unavailable">${customer.phone ? "Revisá el teléfono" : "Sin teléfono"}</small>`}
+      </span>
     </article>`;
   }).join("");
+}
+
+function renderStoreSettings(config = getStoreConfig()) {
+  const { appearance } = config;
+  if (/^#[\da-f]{6}$/i.test(appearance.primaryColor || "")) {
+    document.body.style.setProperty("--wine", appearance.primaryColor);
+  }
+  if (/^#[\da-f]{6}$/i.test(appearance.accentColor || "")) {
+    document.body.style.setProperty("--red", appearance.accentColor);
+  }
+  document.querySelector("#setting-theme").value = appearance.defaultTheme;
+  document.querySelector("#setting-announcement").value = appearance.announcement;
+  document.querySelector("#setting-primary").value = appearance.primaryColor;
+  document.querySelector("#setting-accent").value = appearance.accentColor;
+  document.querySelector("#setting-motion").checked = Boolean(appearance.motion);
+  renderConfigList("shipping-zone-list", config.shippingZones, "zone");
+  renderConfigList("pickup-point-list", config.pickupPoints, "pickup");
+}
+
+function renderConfigList(targetId, items, type) {
+  const target = document.querySelector(`#${targetId}`);
+  if (!items.length) {
+    target.innerHTML = '<p class="config-list-empty">Todavía no hay opciones configuradas.</p>';
+    return;
+  }
+  target.innerHTML = items.map((item) => {
+    const details = type === "zone"
+      ? `CP ${item.postalStart}–${item.postalEnd} · ${formatPrice(Number(item.price))}`
+      : item.detail;
+    return `<article class="config-list-item">
+      <span class="config-item-copy"><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(details)}</small></span>
+      <span class="config-item-actions">
+        <button type="button" data-config-edit="${escapeHTML(item.id)}" data-config-type="${type}">Editar</button>
+        <button type="button" data-config-delete="${escapeHTML(item.id)}" data-config-type="${type}" ${type === "pickup" && items.length === 1 ? "disabled" : ""}>Eliminar</button>
+      </span>
+    </article>`;
+  }).join("");
+}
+
+function openConfigEditor(type, item = null) {
+  configItemForm.reset();
+  document.querySelector("#config-item-error").textContent = "";
+  document.querySelector("#config-item-type").value = type;
+  document.querySelector("#config-item-id").value = item?.id || "";
+  document.querySelector("#config-item-title").textContent = item ? "Editar opción" : type === "zone" ? "Nueva zona" : "Nuevo punto de retiro";
+  document.querySelector("#config-item-name").value = item?.name || "";
+  document.querySelector("#config-postal-start").value = item?.postalStart ?? "";
+  document.querySelector("#config-postal-end").value = item?.postalEnd ?? "";
+  document.querySelector("#config-shipping-price").value = item?.price ?? "";
+  document.querySelector("#config-pickup-detail").value = item?.detail || "";
+  document.querySelectorAll(".config-zone-fields").forEach((field) => { field.hidden = type !== "zone"; });
+  document.querySelectorAll(".config-pickup-fields").forEach((field) => { field.hidden = type !== "pickup"; });
+  document.querySelector("#config-postal-start").required = type === "zone";
+  document.querySelector("#config-postal-end").required = type === "zone";
+  document.querySelector("#config-shipping-price").required = type === "zone";
+  document.querySelector("#config-pickup-detail").required = type === "pickup";
+  configItemEditor.showModal();
+  document.querySelector("#config-item-name").focus();
+}
+
+function configureContactMessage(order) {
+  const customer = order.customer || {};
+  const phone = String(customer.phone || "").replace(/\D/g, "");
+  if (phone.length < 10 || phone.length > 15) return "";
+  const greetingName = customer.name ? ` ${customer.name}` : "";
+  const items = Array.isArray(order.items)
+    ? order.items.map((item) => `${Number(item.quantity) || 1} × ${item.name}`).join(", ")
+    : "";
+  const message = `Hola${greetingName}, te contacto por tu pedido de demostración ${order.id} en Saintless.${items ? ` Productos: ${items}.` : ""} ¿Coordinamos la entrega?`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
 function renderProductRows() {
@@ -203,11 +300,106 @@ document.querySelector("#clear-demo-orders").addEventListener("click", () => {
 document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
   button.addEventListener("click", () => updateTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
 });
+document.querySelector("#settings-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const config = getStoreConfig();
+  config.appearance = {
+    ...config.appearance,
+    defaultTheme: document.querySelector("#setting-theme").value,
+    announcement: document.querySelector("#setting-announcement").value.trim(),
+    primaryColor: document.querySelector("#setting-primary").value,
+    accentColor: document.querySelector("#setting-accent").value,
+    motion: document.querySelector("#setting-motion").checked,
+  };
+  if (!config.appearance.announcement) {
+    document.querySelector("#setting-announcement").focus();
+    showToast("Escribí un mensaje para la franja superior.");
+    return;
+  }
+  saveStoreConfig(config);
+  updateTheme(config.appearance.defaultTheme);
+  showToast("Personalización guardada para esta tienda local.");
+});
+document.querySelector("#add-shipping-zone").addEventListener("click", () => openConfigEditor("zone"));
+document.querySelector("#add-pickup-point").addEventListener("click", () => openConfigEditor("pickup"));
+document.querySelector("#close-config-editor").addEventListener("click", () => configItemEditor.close());
+document.querySelector("#cancel-config-editor").addEventListener("click", () => configItemEditor.close());
+configItemEditor.addEventListener("click", (event) => {
+  if (event.target === configItemEditor) configItemEditor.close();
+});
+configItemForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const type = document.querySelector("#config-item-type").value;
+  const id = document.querySelector("#config-item-id").value;
+  const name = document.querySelector("#config-item-name").value.trim();
+  const config = getStoreConfig();
+  const items = type === "zone" ? config.shippingZones : config.pickupPoints;
+  let item;
+  if (type === "zone") {
+    const postalStart = Number(document.querySelector("#config-postal-start").value);
+    const postalEnd = Number(document.querySelector("#config-postal-end").value);
+    const price = Number(document.querySelector("#config-shipping-price").value);
+    if (!name || !Number.isInteger(postalStart) || !Number.isInteger(postalEnd) || postalStart < 0 || postalEnd > 9999 || postalStart > postalEnd || !Number.isFinite(price) || price < 0) {
+      document.querySelector("#config-item-error").textContent = "Revisá el nombre, el rango de códigos postales y el costo.";
+      return;
+    }
+    const overlaps = items.some((zone) =>
+      zone.id !== id && postalStart <= Number(zone.postalEnd) && postalEnd >= Number(zone.postalStart),
+    );
+    if (overlaps) {
+      document.querySelector("#config-item-error").textContent = "Este rango se superpone con otra zona. Usá un rango distinto.";
+      return;
+    }
+    item = { id: id || `zone-${crypto.randomUUID()}`, name, postalStart, postalEnd, price };
+  } else {
+    const detail = document.querySelector("#config-pickup-detail").value.trim();
+    if (!name || !detail) {
+      document.querySelector("#config-item-error").textContent = "Completá el nombre, la ubicación y la fecha del punto.";
+      return;
+    }
+    item = { id: id || `pickup-${crypto.randomUUID()}`, name, detail };
+  }
+  const existingIndex = items.findIndex((entry) => entry.id === id);
+  if (existingIndex >= 0) items[existingIndex] = item;
+  else items.push(item);
+  if (type === "zone") config.shippingZones = items;
+  else config.pickupPoints = items;
+  saveStoreConfig(config);
+  configItemEditor.close();
+  showToast(type === "zone" ? "Zona de envío guardada." : "Punto de retiro guardado.");
+});
+for (const listId of ["shipping-zone-list", "pickup-point-list"]) {
+  document.querySelector(`#${listId}`).addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-config-edit]");
+    const deleteButton = event.target.closest("[data-config-delete]");
+    const type = (editButton || deleteButton)?.dataset.configType;
+    if (!type) return;
+    const config = getStoreConfig();
+    const items = type === "zone" ? config.shippingZones : config.pickupPoints;
+    if (editButton) {
+      const item = items.find((entry) => entry.id === editButton.dataset.configEdit);
+      if (item) openConfigEditor(type, item);
+      return;
+    }
+    if (type === "pickup" && items.length === 1) {
+      showToast("Dejá al menos un punto de retiro disponible.");
+      return;
+    }
+    if (!window.confirm("¿Eliminar esta opción de entrega?")) return;
+    const filtered = items.filter((entry) => entry.id !== deleteButton.dataset.configDelete);
+    if (type === "zone") config.shippingZones = filtered;
+    else config.pickupPoints = filtered;
+    saveStoreConfig(config);
+    showToast("Opción de entrega eliminada.");
+  });
+}
 window.addEventListener("storage", (event) => {
   if (event.key === PRODUCT_KEY || event.key === ORDER_KEY) renderDashboard();
   if (event.key === "saintlessTheme" && event.newValue) updateTheme(event.newValue);
+  if (event.key === CONFIG_KEY) renderStoreSettings();
 });
 
 fillImageSelect();
-updateTheme(localStorage.getItem("saintlessTheme") || "light");
+renderStoreSettings();
+updateTheme(localStorage.getItem("saintlessTheme") || getStoreConfig().appearance.defaultTheme || "light");
 renderDashboard();
